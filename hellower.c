@@ -3,6 +3,7 @@
 #include <linux/init.h> /* Определения макросов */
 #include <linux/fs.h>
 #include <asm/uaccess.h> /* put_user */
+#include <linux/timer.h>
 
 // Ниже мы задаём информацию о модуле, которую можно будет увидеть с помощью Modinfo
 MODULE_LICENSE( "GPL" );
@@ -22,10 +23,11 @@ static ssize_t device_write( struct file *, const char *, size_t, loff_t * );
 // Глобальные переменные, объявлены как static, воизбежание конфликтов имен.
 static int major_number; /* Старший номер устройства нашего драйвера */
 static int is_device_open = 0; /* Используется ли девайс ? */
-static char text[] = "hello\n"; /* Текст, который мы будет отдавать при обращении к нашему устройству */
+static char text[] = "hello"; /* Текст, который мы будет отдавать при обращении к нашему устройству */
 static char* text_ptr = text; /* Указатель на текущую позицию в тексте */
 
-static int tickTime;
+static int tick_time;
+static int hello_counter;
 
 // Прописываем обработчики операций на устройством
 static struct file_operations fops =
@@ -36,9 +38,22 @@ static struct file_operations fops =
     .release = device_release
 };
 
+//таймер
+static struct timer_list my_timer;
+
+void my_timer_callback(unsigned long data )
+{
+    if (tick_time != 0) {
+        printk("%s: %d\n", text, hello_counter++);
+        mod_timer(&my_timer, jiffies + msecs_to_jiffies(tick_time));
+    }
+}
+
 // Функция загрузки модуля. Входная точка. Можем считать что это наш main()
 static int __init test_init( void )
 {
+	tick_time = 0;
+	hello_counter = 0;
     printk( KERN_ALERT "TEST driver loaded!\n" );
 
  // Регистрируем устройсво и получаем старший номер устройства
@@ -48,11 +63,13 @@ static int __init test_init( void )
         printk( "Registering the character device failed with %d\n", major_number );
         return major_number;
     } 
+    //установка таймера
+    setup_timer(&my_timer, my_timer_callback, 0);
 
  // Сообщаем присвоенный нам старший номер устройства
-    printk( "Test module is loaded!\n" );
+    printk("Test module is loaded!\n");
 
-    printk( "Please, create a dev file with 'mknod /dev/hellower c %d 0'.\n", major_number );
+    printk("Please, create a dev file with 'mknod /dev/hellower c %d 0'.\n", major_number);
 
     return SUCCESS;
 }
@@ -60,17 +77,19 @@ static int __init test_init( void )
 // Функция выгрузки модуля
 static void __exit test_exit( void )
 {
- // Освобождаем устройство
-    unregister_chrdev( major_number, DEVICE_NAME );
+	//удаление таймера
+	del_timer(&my_timer);
+ 	// Освобождаем устройство
+    unregister_chrdev(major_number, DEVICE_NAME);
 
-     printk( KERN_ALERT "Test module is unloaded!\n" );
+    printk(KERN_ALERT "Test module is unloaded!\n");
 }
 
 // Указываем наши функции загрузки и выгрузки
 module_init( test_init );
 module_exit( test_exit );
 
-static int device_open( struct inode *inode, struct file *file )
+static int device_open(struct inode *inode, struct file *file)
 {
     text_ptr = text;
 
@@ -82,35 +101,30 @@ static int device_open( struct inode *inode, struct file *file )
     return SUCCESS;
 }
 
-static int device_release( struct inode *inode, struct file *file )
+static int device_release(struct inode *inode, struct file *file)
 {
     is_device_open--;
     return SUCCESS;
 }
 
-static ssize_t
-
-device_write( struct file *filp, const char *buff, size_t len, loff_t * off )
+static ssize_t device_write(struct file *filp, const char *buff, size_t len, loff_t * off)
 {
-    sscanf(buff, "%d", &tickTime);
+    sscanf(buff, "%d", &tick_time);
+    tick_time *= 1000;
+  	mod_timer(&my_timer, jiffies + msecs_to_jiffies(tick_time));
     return len;
 }
 
-static ssize_t device_read( struct file *filp, /* include/linux/fs.h */
-    char *buffer, /* buffer */
-    size_t length, /* buffer length */
-    loff_t * offset )
+static ssize_t device_read(struct file *filp, char *buffer, size_t length, loff_t * offset) 
 {
     int byte_read = 0;
-
-    if ( *text_ptr == 0 )
+    if (*text_ptr == 0 ) {
         return 0;
-
-    while ( length && *text_ptr ) {
-        put_user( *( text_ptr++ ), buffer++ );
+    }
+    while (length && *text_ptr) {
+        put_user(*(text_ptr++), buffer++);
         length--;
         byte_read++;
     }
-
     return byte_read;
 }
