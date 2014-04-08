@@ -9,16 +9,16 @@
 MODULE_LICENSE( "GPL" );
 MODULE_AUTHOR( "Isachenko Andrew" );
 MODULE_DESCRIPTION( "print hello in log every x second" );
-MODULE_SUPPORTED_DEVICE( "hellower" );
+MODULE_SUPPORTED_DEVICE("hellower");
 
 #define SUCCESS 0
 #define DEVICE_NAME "hellower" /* Имя нашего устройства */
 
 // Поддерживаемые нашим устройством операции
-static int device_open( struct inode *, struct file * );
-static int device_release( struct inode *, struct file * );
-static ssize_t device_read( struct file *, char *, size_t, loff_t * );
-static ssize_t device_write( struct file *, const char *, size_t, loff_t * );
+static int device_open(struct inode *, struct file *);
+static int device_release(struct inode *, struct file *);
+static ssize_t device_read(struct file *, char *, size_t, loff_t *);
+static ssize_t device_write(struct file *, const char *, size_t, loff_t *);
 
 // Глобальные переменные, объявлены как static, воизбежание конфликтов имен.
 static int major_number; /* Старший номер устройства нашего драйвера */
@@ -41,7 +41,7 @@ static struct file_operations fops =
 //таймер
 static struct timer_list my_timer;
 
-void my_timer_callback(unsigned long data )
+void my_timer_callback(unsigned long data)
 {
     if (tick_time != 0) {
         printk("%s: %d\n", text, hello_counter++);
@@ -50,17 +50,17 @@ void my_timer_callback(unsigned long data )
 }
 
 // Функция загрузки модуля. Входная точка. Можем считать что это наш main()
-static int __init test_init( void )
+static int __init test_init(void)
 {
 	tick_time = 0;
 	hello_counter = 0;
     printk( KERN_ALERT "TEST driver loaded!\n" );
 
  // Регистрируем устройсво и получаем старший номер устройства
-    major_number = register_chrdev( 0, DEVICE_NAME, &fops );
+    major_number = register_chrdev(0, DEVICE_NAME, &fops);
 
-    if ( major_number < 0 ) {
-        printk( "Registering the character device failed with %d\n", major_number );
+    if (major_number < 0) {
+        printk("Registering the character device failed with %d\n", major_number);
         return major_number;
     } 
     //установка таймера
@@ -75,7 +75,7 @@ static int __init test_init( void )
 }
 
 // Функция выгрузки модуля
-static void __exit test_exit( void )
+static void __exit test_exit(void)
 {
 	//удаление таймера
 	del_timer(&my_timer);
@@ -86,8 +86,8 @@ static void __exit test_exit( void )
 }
 
 // Указываем наши функции загрузки и выгрузки
-module_init( test_init );
-module_exit( test_exit );
+module_init(test_init);
+module_exit(test_exit);
 
 static int device_open(struct inode *inode, struct file *file)
 {
